@@ -552,31 +552,133 @@ export default function AdminUserDetailPage({ params }: { params: Promise<{ user
                 {setlists.map((setlist) => (
                   <div
                     key={setlist._id}
-                    className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
-                    <h3 className="text-lg font-bold text-gray-800 text-right mb-2">
-                      {setlist.name}
-                    </h3>
-                    <p className="text-gray-500 text-right mb-4">
-                      {Array.isArray(setlist.songs) ? setlist.songs.length : 0} שירים
-                    </p>
-                    <div className="flex gap-2">
+                    className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
+                    <div
+                      className="p-4 cursor-pointer hover:bg-gray-50"
+                      onClick={() => {
+                        setSelectedSetlist(setlist);
+                        setCurrentScreen("setlist-detail");
+                      }}>
+                      <h3 className="text-lg font-bold text-gray-800 text-right mb-2">
+                        {setlist.name}
+                      </h3>
+                      <p className="text-gray-500 text-right">
+                        {Array.isArray(setlist.songs) ? setlist.songs.length : 0} שירים
+                      </p>
+                    </div>
+                    <div className="flex border-t border-gray-100">
+                      <button
+                        onClick={() => {
+                          setSelectedSetlist(setlist);
+                          setCurrentScreen("setlist-detail");
+                        }}
+                        className="flex-1 py-3 text-indigo-600 font-semibold hover:bg-indigo-50 transition-colors">
+                        צפה
+                      </button>
                       <button
                         onClick={() => {
                           setEditingSetlist({ ...setlist });
                           setShowEditSetlistModal(true);
                         }}
-                        className="flex-1 py-2 text-indigo-600 font-semibold bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors">
-                        עריכה
+                        className="flex-1 py-3 text-gray-600 font-semibold hover:bg-gray-50 transition-colors border-r border-gray-100">
+                        ערוך שם
                       </button>
                       <button
                         onClick={() => handleDeleteSetlist(setlist._id)}
-                        className="flex-1 py-2 text-red-600 font-semibold bg-red-50 rounded-lg hover:bg-red-100 transition-colors">
-                        מחיקה
+                        className="flex-1 py-3 text-red-600 font-semibold hover:bg-red-50 transition-colors border-r border-gray-100">
+                        מחק
                       </button>
                     </div>
                   </div>
                 ))}
               </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // Setlist Detail Screen - Shows songs in the setlist with lyrics
+    if (currentScreen === "setlist-detail" && selectedSetlist) {
+      // Get the actual song objects from the setlist
+      const setlistSongs: Song[] = Array.isArray(selectedSetlist.songs)
+        ? selectedSetlist.songs.map((songRef) => {
+            if (typeof songRef === "string") {
+              return songs.find((s) => s._id === songRef);
+            }
+            return songRef as Song;
+          }).filter((s): s is Song => s !== undefined)
+        : [];
+
+      return (
+        <div className="flex flex-col h-full bg-gray-50">
+          {/* Header */}
+          <div className="bg-white p-4 border-b border-gray-200">
+            <h2 className="text-2xl font-bold text-gray-800 text-right">{selectedSetlist.name}</h2>
+            <p className="text-gray-500 text-right">{setlistSongs.length} שירים ברשימה</p>
+          </div>
+
+          {/* Songs in Setlist */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            {setlistSongs.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="text-6xl mb-4">🎤</div>
+                <h3 className="text-xl font-bold text-gray-800 mb-2">אין שירים ברשימה</h3>
+                <p className="text-gray-500">הרשימה ריקה</p>
+              </div>
+            ) : (
+              setlistSongs.map((song, index) => (
+                <div
+                  key={song._id}
+                  className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
+                  {/* Song Header */}
+                  <div className="bg-indigo-50 p-4 border-b border-indigo-100">
+                    <div className="flex items-center justify-between">
+                      <span className="bg-indigo-600 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm">
+                        {index + 1}
+                      </span>
+                      <div className="flex-1 mr-3">
+                        <h3 className="text-lg font-bold text-gray-800 text-right">
+                          {song.title}
+                        </h3>
+                        <p className="text-indigo-600 text-right text-sm">{song.artist}</p>
+                      </div>
+                      <span className="bg-blue-100 text-blue-600 px-2 py-1 rounded text-xs">
+                        {getLanguageDisplay(song.language)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Song Lyrics */}
+                  <div className="p-4">
+                    <div className="bg-gray-50 rounded-lg p-4 border border-gray-200 max-h-60 overflow-y-auto">
+                      <pre className="text-right text-gray-800 whitespace-pre-wrap font-sans leading-7 text-sm">
+                        {song.lyrics}
+                      </pre>
+                    </div>
+                  </div>
+
+                  {/* Song Actions */}
+                  <div className="flex border-t border-gray-100">
+                    <button
+                      onClick={() => {
+                        setSelectedSong(song);
+                        setCurrentScreen("song-detail");
+                      }}
+                      className="flex-1 py-3 text-indigo-600 font-semibold hover:bg-indigo-50 transition-colors">
+                      פרטים מלאים
+                    </button>
+                    <button
+                      onClick={() => {
+                        setEditingSong({ ...song });
+                        setShowEditSongModal(true);
+                      }}
+                      className="flex-1 py-3 text-gray-600 font-semibold hover:bg-gray-50 transition-colors border-r border-gray-100">
+                      ערוך
+                    </button>
+                  </div>
+                </div>
+              ))
             )}
           </div>
         </div>
