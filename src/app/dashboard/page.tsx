@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { logout, getAuthHeaders, getToken, type AuthUser } from "@/lib/auth";
+import { useSearchParams } from "next/navigation";
+import { logout, getAuthHeaders, getToken, type AuthUser, isImpersonating, setImpersonation, clearImpersonation, getImpersonationUser } from "@/lib/auth";
 
 interface DashboardStats {
   songsCount: number;
@@ -11,6 +12,7 @@ interface DashboardStats {
 }
 
 export default function DashboardPage() {
+  const searchParams = useSearchParams();
   const [user, setUser] = useState<AuthUser | null>(null);
   const [stats, setStats] = useState<DashboardStats>({
     songsCount: 0,
@@ -18,15 +20,38 @@ export default function DashboardPage() {
     credits: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [impersonating, setImpersonatingState] = useState(false);
+  const [impersonatedUser, setImpersonatedUser] = useState<{ email: string; username?: string } | null>(null);
 
   useEffect(() => {
+    // Check for impersonation token in URL
+    const impersonationToken = searchParams.get('impersonationToken');
+    const impersonationEmail = searchParams.get('email');
+    const impersonationUsername = searchParams.get('username');
+
+    if (impersonationToken) {
+      // Set impersonation mode
+      setImpersonation(impersonationToken, {
+        email: impersonationEmail || 'Unknown',
+        username: impersonationUsername || undefined
+      });
+      // Remove query params from URL
+      window.history.replaceState({}, '', '/dashboard');
+    }
+
+    // Check if we're impersonating
+    if (isImpersonating()) {
+      setImpersonatingState(true);
+      setImpersonatedUser(getImpersonationUser());
+    }
+
     // Check if logged in
     if (!getToken()) {
       window.location.href = "/auth/login";
       return;
     }
     fetchDashboardData();
-  }, []);
+  }, [searchParams]);
 
   const fetchDashboardData = async () => {
     try {
@@ -89,10 +114,38 @@ export default function DashboardPage() {
     );
   }
 
+  const handleExitImpersonation = () => {
+    clearImpersonation();
+    window.location.href = "/admin";
+  };
+
   return (
     <div className="min-h-screen bg-gray-50" dir="rtl">
+      {/* Impersonation Banner */}
+      {impersonating && (
+        <div className="bg-red-600 text-white py-3 px-4">
+          <div className="max-w-7xl mx-auto flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">🎭</span>
+              <div>
+                <p className="font-bold">מצב התחזות פעיל</p>
+                <p className="text-sm text-red-100">
+                  צופה כמשתמש: {impersonatedUser?.username || impersonatedUser?.email || 'Unknown'}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={handleExitImpersonation}
+              className="bg-white text-red-600 font-bold py-2 px-4 rounded-lg hover:bg-red-100 transition-colors"
+            >
+              יציאה מהתחזות
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
-      <header className="bg-white shadow-sm">
+      <header className={`bg-white shadow-sm ${impersonating ? 'border-t-4 border-red-500' : ''}`}>
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
           <div>
             <h1 className="text-xl font-bold text-indigo-600">Zamar</h1>
@@ -101,15 +154,22 @@ export default function DashboardPage() {
             )}
           </div>
           <nav className="flex gap-4">
+            {impersonating && (
+              <Link href="/admin" className="text-red-600 hover:text-red-700 font-medium">
+                חזרה לאדמין
+              </Link>
+            )}
             <Link href="/credits" className="text-gray-600 hover:text-indigo-600">
               יתרה
             </Link>
-            <button
-              onClick={handleLogout}
-              className="text-gray-600 hover:text-red-600"
-            >
-              התנתקות
-            </button>
+            {!impersonating && (
+              <button
+                onClick={handleLogout}
+                className="text-gray-600 hover:text-red-600"
+              >
+                התנתקות
+              </button>
+            )}
           </nav>
         </div>
       </header>

@@ -395,7 +395,7 @@ export default function AdminUserDetailPage({ params }: { params: Promise<{ user
               placeholder="חפש שיר..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-gray-100 border border-gray-200 rounded-lg px-4 py-3 text-right text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full bg-white border border-gray-300 rounded-lg px-4 py-3 text-right text-gray-800 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
               dir="rtl"
             />
           </div>
@@ -759,7 +759,7 @@ export default function AdminUserDetailPage({ params }: { params: Promise<{ user
               </div>
 
               {/* View as Native App Button */}
-              <div className="mt-6 pt-6 border-t border-gray-200">
+              <div className="mt-6 pt-6 border-t border-gray-200 space-y-3">
                 <button
                   onClick={async () => {
                     try {
@@ -787,8 +787,38 @@ export default function AdminUserDetailPage({ params }: { params: Promise<{ user
                   <span className="text-lg">📱</span>
                   <span>צפה באפליקציה הנייטיב</span>
                 </button>
-                <p className="text-xs text-gray-500 text-center mt-2">
-                  פותח את תצוגת האפליקציה כמשתמש זה
+
+                {/* View in Dashboard Button */}
+                <button
+                  onClick={async () => {
+                    try {
+                      // Get impersonation token from backend
+                      const response = await fetch(`/api/admin/users/${userId}/impersonate`, {
+                        method: 'POST',
+                        headers: getAuthHeaders(),
+                      });
+
+                      if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.error || 'Failed to get impersonation token');
+                      }
+
+                      const data = await response.json();
+                      // Open dashboard with impersonation token
+                      const dashboardUrl = `/dashboard?impersonationToken=${encodeURIComponent(data.token)}&email=${encodeURIComponent(targetUser?.email || '')}&username=${encodeURIComponent(targetUser?.username || '')}`;
+                      window.open(dashboardUrl, '_blank');
+                    } catch (err) {
+                      console.error('Failed to open dashboard:', err);
+                      setError(err instanceof Error ? err.message : 'Failed to open dashboard');
+                    }
+                  }}
+                  className="w-full bg-gradient-to-r from-green-600 to-teal-600 text-white font-bold py-3 px-4 rounded-lg hover:from-green-700 hover:to-teal-700 transition-all shadow-lg flex items-center justify-center gap-2">
+                  <span className="text-lg">🖥️</span>
+                  <span>צפה בדשבורד (פרימיום)</span>
+                </button>
+
+                <p className="text-xs text-gray-500 text-center">
+                  פותח את הדשבורד כמשתמש זה עם כל הפיצ'רים
                 </p>
               </div>
             </div>
@@ -904,7 +934,7 @@ export default function AdminUserDetailPage({ params }: { params: Promise<{ user
                     type="text"
                     value={newSong.title}
                     onChange={(e) => setNewSong({ ...newSong, title: e.target.value })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-right"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-right placeholder:text-gray-500"
                     placeholder="הכנס שם שיר"
                   />
                 </div>
@@ -915,7 +945,7 @@ export default function AdminUserDetailPage({ params }: { params: Promise<{ user
                     type="text"
                     value={newSong.artist}
                     onChange={(e) => setNewSong({ ...newSong, artist: e.target.value })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-right"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-right placeholder:text-gray-500"
                     placeholder="הכנס שם אמן"
                   />
                 </div>
@@ -939,7 +969,7 @@ export default function AdminUserDetailPage({ params }: { params: Promise<{ user
                     value={newSong.lyrics}
                     onChange={(e) => setNewSong({ ...newSong, lyrics: e.target.value })}
                     rows={10}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-right resize-none"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-right resize-none placeholder:text-gray-500"
                     placeholder="הכנס מילות שיר"
                   />
                 </div>
@@ -1064,7 +1094,7 @@ export default function AdminUserDetailPage({ params }: { params: Promise<{ user
                   type="text"
                   value={newSetlist.name}
                   onChange={(e) => setNewSetlist({ name: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-right"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-right placeholder:text-gray-500"
                   placeholder="הכנס שם לרשימה"
                 />
               </div>

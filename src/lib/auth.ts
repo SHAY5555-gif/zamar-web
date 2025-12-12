@@ -1,6 +1,8 @@
 // Auth utility functions for the web app
 
 const TOKEN_KEY = 'zamar_auth_token';
+const IMPERSONATION_TOKEN_KEY = 'zamar_impersonation_token';
+const IMPERSONATION_USER_KEY = 'zamar_impersonation_user';
 
 export interface AuthUser {
   _id: string;
@@ -17,9 +19,45 @@ export interface AuthUser {
   };
 }
 
-// Get stored token
+// Check if we're in impersonation mode
+export function isImpersonating(): boolean {
+  if (typeof window === 'undefined') return false;
+  return !!sessionStorage.getItem(IMPERSONATION_TOKEN_KEY);
+}
+
+// Get impersonation token
+export function getImpersonationToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  return sessionStorage.getItem(IMPERSONATION_TOKEN_KEY);
+}
+
+// Get impersonation user info
+export function getImpersonationUser(): { email: string; username?: string } | null {
+  if (typeof window === 'undefined') return null;
+  const data = sessionStorage.getItem(IMPERSONATION_USER_KEY);
+  return data ? JSON.parse(data) : null;
+}
+
+// Set impersonation mode
+export function setImpersonation(token: string, user: { email: string; username?: string }): void {
+  if (typeof window === 'undefined') return;
+  sessionStorage.setItem(IMPERSONATION_TOKEN_KEY, token);
+  sessionStorage.setItem(IMPERSONATION_USER_KEY, JSON.stringify(user));
+}
+
+// Clear impersonation mode
+export function clearImpersonation(): void {
+  if (typeof window === 'undefined') return;
+  sessionStorage.removeItem(IMPERSONATION_TOKEN_KEY);
+  sessionStorage.removeItem(IMPERSONATION_USER_KEY);
+}
+
+// Get stored token (returns impersonation token if in impersonation mode)
 export function getToken(): string | null {
   if (typeof window === 'undefined') return null;
+  // If impersonating, return the impersonation token
+  const impersonationToken = sessionStorage.getItem(IMPERSONATION_TOKEN_KEY);
+  if (impersonationToken) return impersonationToken;
   return localStorage.getItem(TOKEN_KEY);
 }
 

@@ -216,7 +216,7 @@ export default function SetlistDetailPage() {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="חיפוש שיר..."
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg mb-4 text-right"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg mb-4 text-right placeholder:text-gray-500"
             />
             <div className="max-h-64 overflow-y-auto space-y-2">
               {filteredSongs.length === 0 ? (

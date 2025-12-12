@@ -548,7 +548,7 @@ export default function SongsPage() {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="חיפוש לפי שם שיר או אמן..."
-            className="w-full max-w-md px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            className="w-full max-w-md px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 placeholder:text-gray-500"
           />
         </div>
 
@@ -649,7 +649,7 @@ export default function SongsPage() {
                     type="text"
                     value={newSong.title}
                     onChange={(e) => setNewSong({ ...newSong, title: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-right"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-right placeholder:text-gray-500"
                     placeholder="הכנס שם שיר"
                   />
                 </div>
@@ -662,7 +662,7 @@ export default function SongsPage() {
                     type="text"
                     value={newSong.artist}
                     onChange={(e) => setNewSong({ ...newSong, artist: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-right"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-right placeholder:text-gray-500"
                     placeholder="הכנס שם אמן"
                   />
                 </div>
@@ -690,7 +690,7 @@ export default function SongsPage() {
                     value={newSong.lyrics}
                     onChange={(e) => setNewSong({ ...newSong, lyrics: e.target.value })}
                     rows={8}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-right"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-right placeholder:text-gray-500"
                     placeholder="הכנס מילות שיר"
                   />
                 </div>
@@ -935,7 +935,7 @@ export default function SongsPage() {
                         }}
                         onKeyDown={(e) => e.key === "Enter" && !aiSearchingIndexes.has(index) && handleAISearch(index)}
                         placeholder='לדוגמה: "Hallelujah - Leonard Cohen"'
-                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 text-right"
+                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 text-right placeholder:text-gray-500"
                         disabled={aiSearchingIndexes.has(index)}
                       />
                       <button
