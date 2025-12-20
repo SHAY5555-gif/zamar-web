@@ -58,6 +58,9 @@ export default function AdminUserDetailPage({ params }: { params: Promise<{ user
   const [showEditSongModal, setShowEditSongModal] = useState(false);
   const [showAddSetlistModal, setShowAddSetlistModal] = useState(false);
   const [showEditSetlistModal, setShowEditSetlistModal] = useState(false);
+  const [showCreditsModal, setShowCreditsModal] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showSetlistSongsModal, setShowSetlistSongsModal] = useState(false);
   const [editingSong, setEditingSong] = useState<Song | null>(null);
   const [editingSetlist, setEditingSetlist] = useState<Setlist | null>(null);
   const [newSong, setNewSong] = useState({
@@ -68,6 +71,8 @@ export default function AdminUserDetailPage({ params }: { params: Promise<{ user
   });
   const [newSetlist, setNewSetlist] = useState({ name: "" });
   const [saving, setSaving] = useState(false);
+  const [creditsAmount, setCreditsAmount] = useState<number>(0);
+  const [creditsOperation, setCreditsOperation] = useState<"add" | "set">("add");
 
   useEffect(() => {
     if (!getToken()) {
@@ -358,6 +363,178 @@ export default function AdminUserDetailPage({ params }: { params: Promise<{ user
     }
   };
 
+  // Credits Functions
+  const handleUpdateCredits = async () => {
+    setSaving(true);
+    setError("");
+
+    try {
+      const response = await fetch(`/api/admin/users/${userId}/credits`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...getAuthHeaders(),
+        },
+        body: JSON.stringify({ amount: creditsAmount, operation: creditsOperation }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to update credits");
+      }
+
+      const result = await response.json();
+      if (targetUser) {
+        setTargetUser({
+          ...targetUser,
+          credits: result.credits || { count: result.newCredits, last_updated: new Date().toISOString() }
+        });
+      }
+      setShowCreditsModal(false);
+      setCreditsAmount(0);
+      setSuccessMessage("הקרדיטים עודכנו בהצלחה");
+      setTimeout(() => setSuccessMessage(""), 3000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "שגיאה בעדכון הקרדיטים");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Subscription Functions
+  const handleToggleSubscription = async () => {
+    setSaving(true);
+    setError("");
+
+    const newActive = !targetUser?.subscription?.active;
+
+    try {
+      const response = await fetch(`/api/admin/users/${userId}/subscription`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...getAuthHeaders(),
+        },
+        body: JSON.stringify({ active: newActive, tier: newActive ? "premium_10" : "free" }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to update subscription");
+      }
+
+      if (targetUser) {
+        setTargetUser({
+          ...targetUser,
+          subscription: { active: newActive, tier: newActive ? "premium_10" : "free" }
+        });
+      }
+      setSuccessMessage(newActive ? "המנוי הופעל בהצלחה" : "המנוי בוטל בהצלחה");
+      setTimeout(() => setSuccessMessage(""), 3000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "שגיאה בעדכון המנוי");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Delete User Function
+  const handleDeleteUser = async () => {
+    setSaving(true);
+    setError("");
+
+    try {
+      const response = await fetch(`/api/admin/users/${userId}`, {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to delete user");
+      }
+
+      setSuccessMessage("המשתמש נמחק בהצלחה");
+      setTimeout(() => {
+        window.location.href = "/admin";
+      }, 1500);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "שגיאה במחיקת המשתמש");
+      setShowDeleteConfirm(false);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Export Data Function
+  const handleExportData = () => {
+    const exportData = {
+      user: {
+        email: targetUser?.email,
+        username: targetUser?.username,
+        credits: targetUser?.credits,
+        subscription: targetUser?.subscription,
+      },
+      songs: songs,
+      setlists: setlists.map(setlist => ({
+        ...setlist,
+        songs: Array.isArray(setlist.songs)
+          ? setlist.songs.map(songRef => {
+              if (typeof songRef === "string") {
+                return songs.find(s => s._id === songRef);
+              }
+              return songRef;
+            }).filter(Boolean)
+          : []
+      })),
+      exportDate: new Date().toISOString(),
+    };
+
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `zamar-export-${targetUser?.email || userId}-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    setSuccessMessage("הנתונים יוצאו בהצלחה");
+    setTimeout(() => setSuccessMessage(""), 3000);
+  };
+
+  // Update Setlist Songs Function
+  const handleUpdateSetlistSongs = async (setlistId: string, songIds: string[]) => {
+    setSaving(true);
+    setError("");
+
+    try {
+      const response = await fetch(`/api/admin/users/${userId}/setlists/${setlistId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          ...getAuthHeaders(),
+        },
+        body: JSON.stringify({ songs: songIds }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to update setlist");
+      }
+
+      const updatedSetlist = await response.json();
+      setSetlists(setlists.map((s) => (s._id === updatedSetlist._id ? updatedSetlist : s)));
+      if (selectedSetlist?._id === updatedSetlist._id) {
+        setSelectedSetlist(updatedSetlist);
+      }
+      setShowSetlistSongsModal(false);
+      setSuccessMessage("השירים ברשימה עודכנו בהצלחה");
+      setTimeout(() => setSuccessMessage(""), 3000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "שגיאה בעדכון הרשימה");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
@@ -577,11 +754,19 @@ export default function AdminUserDetailPage({ params }: { params: Promise<{ user
                       </button>
                       <button
                         onClick={() => {
+                          setSelectedSetlist(setlist);
+                          setShowSetlistSongsModal(true);
+                        }}
+                        className="flex-1 py-3 text-purple-600 font-semibold hover:bg-purple-50 transition-colors border-r border-gray-100">
+                        ערוך שירים
+                      </button>
+                      <button
+                        onClick={() => {
                           setEditingSetlist({ ...setlist });
                           setShowEditSetlistModal(true);
                         }}
                         className="flex-1 py-3 text-gray-600 font-semibold hover:bg-gray-50 transition-colors border-r border-gray-100">
-                        ערוך שם
+                        שם
                       </button>
                       <button
                         onClick={() => handleDeleteSetlist(setlist._id)}
@@ -742,20 +927,50 @@ export default function AdminUserDetailPage({ params }: { params: Promise<{ user
                   <div className="text-3xl font-bold text-green-600">{setlists.length}</div>
                   <div className="text-green-600 text-sm">רשימות</div>
                 </div>
-                <div className="bg-yellow-50 rounded-lg p-4 text-center">
+
+                {/* Credits - Clickable */}
+                <button
+                  onClick={() => setShowCreditsModal(true)}
+                  className="w-full bg-yellow-50 rounded-lg p-4 text-center hover:bg-yellow-100 transition-colors border-2 border-transparent hover:border-yellow-300">
                   <div className="text-3xl font-bold text-yellow-600">
                     ${((targetUser?.credits?.count || 0) / 100).toFixed(2)}
                   </div>
-                  <div className="text-yellow-600 text-sm">יתרה</div>
-                </div>
-                <div className={`rounded-lg p-4 text-center ${targetUser?.subscription?.active ? 'bg-green-50' : 'bg-gray-50'}`}>
+                  <div className="text-yellow-600 text-sm">יתרה (לחץ לעריכה)</div>
+                </button>
+
+                {/* Subscription - Clickable */}
+                <button
+                  onClick={handleToggleSubscription}
+                  disabled={saving}
+                  className={`w-full rounded-lg p-4 text-center transition-colors border-2 border-transparent ${
+                    targetUser?.subscription?.active
+                      ? 'bg-green-50 hover:bg-green-100 hover:border-green-300'
+                      : 'bg-gray-50 hover:bg-gray-100 hover:border-gray-300'
+                  } ${saving ? 'opacity-50 cursor-not-allowed' : ''}`}>
                   <div className={`text-lg font-bold ${targetUser?.subscription?.active ? 'text-green-600' : 'text-gray-600'}`}>
                     {targetUser?.subscription?.active ? "פרימיום" : "חינמי"}
                   </div>
                   <div className={`text-sm ${targetUser?.subscription?.active ? 'text-green-600' : 'text-gray-500'}`}>
-                    מנוי
+                    לחץ {targetUser?.subscription?.active ? "לביטול" : "להפעלה"}
                   </div>
-                </div>
+                </button>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="mt-6 pt-6 border-t border-gray-200 space-y-3">
+                {/* Export Data Button */}
+                <button
+                  onClick={handleExportData}
+                  className="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-blue-700 transition-all flex items-center justify-center gap-2">
+                  <span>הורד נתונים (JSON)</span>
+                </button>
+
+                {/* Delete User Button */}
+                <button
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="w-full bg-red-100 text-red-600 font-bold py-3 px-4 rounded-lg hover:bg-red-200 transition-all flex items-center justify-center gap-2">
+                  <span>מחק משתמש</span>
+                </button>
               </div>
 
               {/* View as Native App Button */}
@@ -1164,6 +1379,262 @@ export default function AdminUserDetailPage({ params }: { params: Promise<{ user
           </div>
         </div>
       )}
+
+      {/* Credits Modal */}
+      {showCreditsModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4" dir="rtl">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-bold text-gray-900">עריכת קרדיטים</h2>
+                <button
+                  onClick={() => {
+                    setShowCreditsModal(false);
+                    setCreditsAmount(0);
+                  }}
+                  className="text-gray-400 hover:text-gray-600 text-2xl">
+                  ✕
+                </button>
+              </div>
+
+              <div className="mb-4 p-4 bg-gray-50 rounded-lg text-center">
+                <div className="text-sm text-gray-500">יתרה נוכחית</div>
+                <div className="text-2xl font-bold text-yellow-600">
+                  ${((targetUser?.credits?.count || 0) / 100).toFixed(2)}
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1 text-right">פעולה</label>
+                  <select
+                    value={creditsOperation}
+                    onChange={(e) => setCreditsOperation(e.target.value as "add" | "set")}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-right">
+                    <option value="add">הוסף לקיים</option>
+                    <option value="set">קבע ערך חדש</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1 text-right">
+                    סכום (בסנטים - 100 = $1)
+                  </label>
+                  <input
+                    type="number"
+                    value={creditsAmount}
+                    onChange={(e) => setCreditsAmount(Number(e.target.value))}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-right"
+                    placeholder="0"
+                  />
+                  <p className="text-sm text-gray-500 mt-1 text-right">
+                    = ${(creditsAmount / 100).toFixed(2)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={handleUpdateCredits}
+                  disabled={saving}
+                  className="flex-1 bg-yellow-600 text-white font-semibold py-3 px-4 rounded-lg hover:bg-yellow-700 disabled:opacity-50 transition-colors">
+                  {saving ? "שומר..." : "עדכן קרדיטים"}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowCreditsModal(false);
+                    setCreditsAmount(0);
+                  }}
+                  className="flex-1 bg-gray-100 text-gray-700 font-semibold py-3 px-4 rounded-lg hover:bg-gray-200 transition-colors">
+                  ביטול
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4" dir="rtl">
+            <div className="p-6">
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <span className="text-3xl">!</span>
+                </div>
+                <h2 className="text-xl font-bold text-gray-900 mb-2">מחיקת משתמש</h2>
+                <p className="text-gray-600">
+                  האם אתה בטוח שברצונך למחוק את המשתמש <strong>{targetUser?.email}</strong>?
+                </p>
+                <p className="text-red-600 text-sm mt-2">
+                  פעולה זו תמחק את כל השירים והרשימות של המשתמש ולא ניתן לשחזר אותם!
+                </p>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={handleDeleteUser}
+                  disabled={saving}
+                  className="flex-1 bg-red-600 text-white font-semibold py-3 px-4 rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors">
+                  {saving ? "מוחק..." : "כן, מחק"}
+                </button>
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="flex-1 bg-gray-100 text-gray-700 font-semibold py-3 px-4 rounded-lg hover:bg-gray-200 transition-colors">
+                  ביטול
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Setlist Songs Editor Modal */}
+      {showSetlistSongsModal && selectedSetlist && (
+        <SetlistSongsEditor
+          setlist={selectedSetlist}
+          allSongs={songs}
+          onSave={(songIds) => handleUpdateSetlistSongs(selectedSetlist._id, songIds)}
+          onClose={() => setShowSetlistSongsModal(false)}
+          saving={saving}
+        />
+      )}
+    </div>
+  );
+}
+
+// Setlist Songs Editor Component
+function SetlistSongsEditor({
+  setlist,
+  allSongs,
+  onSave,
+  onClose,
+  saving,
+}: {
+  setlist: { _id: string; name: string; songs: string[] | { _id: string }[] };
+  allSongs: { _id: string; title: string; artist: string }[];
+  onSave: (songIds: string[]) => void;
+  onClose: () => void;
+  saving: boolean;
+}) {
+  const [selectedSongIds, setSelectedSongIds] = useState<string[]>(() => {
+    return (setlist.songs || []).map((s) => (typeof s === "string" ? s : s._id));
+  });
+
+  const toggleSong = (songId: string) => {
+    setSelectedSongIds((prev) =>
+      prev.includes(songId) ? prev.filter((id) => id !== songId) : [...prev, songId]
+    );
+  };
+
+  const moveSong = (index: number, direction: "up" | "down") => {
+    const newIndex = direction === "up" ? index - 1 : index + 1;
+    if (newIndex < 0 || newIndex >= selectedSongIds.length) return;
+
+    const newOrder = [...selectedSongIds];
+    [newOrder[index], newOrder[newIndex]] = [newOrder[newIndex], newOrder[index]];
+    setSelectedSongIds(newOrder);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-hidden flex flex-col" dir="rtl">
+        <div className="p-6 border-b border-gray-200">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-bold text-gray-900">עריכת שירים ברשימה: {setlist.name}</h2>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl">
+              ✕
+            </button>
+          </div>
+          <p className="text-gray-500 text-sm mt-1">{selectedSongIds.length} שירים נבחרו</p>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-6">
+          <div className="grid grid-cols-2 gap-4">
+            {/* Available Songs */}
+            <div>
+              <h3 className="font-semibold text-gray-700 mb-3">שירים זמינים</h3>
+              <div className="space-y-2 max-h-80 overflow-y-auto">
+                {allSongs
+                  .filter((song) => !selectedSongIds.includes(song._id))
+                  .map((song) => (
+                    <button
+                      key={song._id}
+                      onClick={() => toggleSong(song._id)}
+                      className="w-full text-right p-3 bg-gray-50 rounded-lg hover:bg-indigo-50 hover:border-indigo-300 border border-gray-200 transition-colors">
+                      <div className="font-medium text-gray-800">{song.title}</div>
+                      <div className="text-sm text-gray-500">{song.artist}</div>
+                    </button>
+                  ))}
+                {allSongs.filter((song) => !selectedSongIds.includes(song._id)).length === 0 && (
+                  <p className="text-gray-400 text-center py-4">כל השירים נבחרו</p>
+                )}
+              </div>
+            </div>
+
+            {/* Selected Songs */}
+            <div>
+              <h3 className="font-semibold text-gray-700 mb-3">שירים ברשימה (לפי סדר)</h3>
+              <div className="space-y-2 max-h-80 overflow-y-auto">
+                {selectedSongIds.map((songId, index) => {
+                  const song = allSongs.find((s) => s._id === songId);
+                  if (!song) return null;
+                  return (
+                    <div
+                      key={songId}
+                      className="flex items-center gap-2 p-3 bg-indigo-50 rounded-lg border border-indigo-200">
+                      <div className="flex flex-col gap-1">
+                        <button
+                          onClick={() => moveSong(index, "up")}
+                          disabled={index === 0}
+                          className="text-gray-400 hover:text-gray-600 disabled:opacity-30">
+                          ^
+                        </button>
+                        <button
+                          onClick={() => moveSong(index, "down")}
+                          disabled={index === selectedSongIds.length - 1}
+                          className="text-gray-400 hover:text-gray-600 disabled:opacity-30">
+                          v
+                        </button>
+                      </div>
+                      <div className="flex-1 text-right">
+                        <div className="font-medium text-gray-800">
+                          <span className="text-indigo-600 ml-2">{index + 1}.</span>
+                          {song.title}
+                        </div>
+                        <div className="text-sm text-gray-500">{song.artist}</div>
+                      </div>
+                      <button
+                        onClick={() => toggleSong(songId)}
+                        className="text-red-500 hover:text-red-700 p-1">
+                        ✕
+                      </button>
+                    </div>
+                  );
+                })}
+                {selectedSongIds.length === 0 && (
+                  <p className="text-gray-400 text-center py-4">לא נבחרו שירים</p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-6 border-t border-gray-200 flex gap-3">
+          <button
+            onClick={() => onSave(selectedSongIds)}
+            disabled={saving}
+            className="flex-1 bg-indigo-600 text-white font-semibold py-3 px-4 rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors">
+            {saving ? "שומר..." : "שמור שינויים"}
+          </button>
+          <button
+            onClick={onClose}
+            className="flex-1 bg-gray-100 text-gray-700 font-semibold py-3 px-4 rounded-lg hover:bg-gray-200 transition-colors">
+            ביטול
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
