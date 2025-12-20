@@ -126,6 +126,9 @@ export default function AdminPage() {
             )}
           </div>
           <nav className="flex gap-4">
+            <Link href="/admin/library" className="text-purple-600 hover:text-purple-800 font-medium">
+              ספריית תוכן
+            </Link>
             <Link href="/dashboard" className="text-gray-600 hover:text-indigo-600">
               דאשבורד רגיל
             </Link>
