@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { logout, getAuthHeaders, getToken, type AuthUser, isImpersonating, setImpersonation, clearImpersonation, getImpersonationUser } from "@/lib/auth";
@@ -11,7 +11,7 @@ interface DashboardStats {
   credits: number;
 }
 
-export default function DashboardPage() {
+function DashboardContent() {
   const searchParams = useSearchParams();
   const [user, setUser] = useState<AuthUser | null>(null);
   const [stats, setStats] = useState<DashboardStats>({
@@ -220,5 +220,17 @@ export default function DashboardPage() {
         </div>
       </main>
     </div>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+      </div>
+    }>
+      <DashboardContent />
+    </Suspense>
   );
 }

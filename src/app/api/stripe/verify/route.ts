@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+function getStripe() {
+  if (!process.env.STRIPE_SECRET_KEY) {
+    throw new Error("STRIPE_SECRET_KEY is not configured");
+  }
+  return new Stripe(process.env.STRIPE_SECRET_KEY);
+}
 
 export async function GET(request: NextRequest) {
+  const stripe = getStripe();
   try {
     const { searchParams } = new URL(request.url);
     const sessionId = searchParams.get("session_id");
