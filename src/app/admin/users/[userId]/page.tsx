@@ -27,6 +27,7 @@ interface User {
   _id: string;
   email: string;
   username?: string;
+  display_name?: string;
   credits?: {
     count: number;
     last_updated: string;
@@ -73,6 +74,8 @@ export default function AdminUserDetailPage({ params }: { params: Promise<{ user
   const [saving, setSaving] = useState(false);
   const [creditsAmount, setCreditsAmount] = useState<number>(0);
   const [creditsOperation, setCreditsOperation] = useState<"add" | "set">("add");
+  const [showDisplayNameModal, setShowDisplayNameModal] = useState(false);
+  const [newDisplayName, setNewDisplayName] = useState("");
 
   useEffect(() => {
     if (!getToken()) {
@@ -431,6 +434,43 @@ export default function AdminUserDetailPage({ params }: { params: Promise<{ user
       setTimeout(() => setSuccessMessage(""), 3000);
     } catch (err) {
       setError(err instanceof Error ? err.message : "שגיאה בעדכון המנוי");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Display Name Functions
+  const handleUpdateDisplayName = async () => {
+    setSaving(true);
+    setError("");
+
+    try {
+      const response = await fetch(`/api/admin/users/${userId}/display-name`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...getAuthHeaders(),
+        },
+        body: JSON.stringify({ display_name: newDisplayName.trim() || null }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to update display name");
+      }
+
+      const result = await response.json();
+      if (targetUser) {
+        setTargetUser({
+          ...targetUser,
+          display_name: result.user?.display_name || undefined
+        });
+      }
+      setShowDisplayNameModal(false);
+      setNewDisplayName("");
+      setSuccessMessage("שם התצוגה עודכן בהצלחה");
+      setTimeout(() => setSuccessMessage(""), 3000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "שגיאה בעדכון שם התצוגה");
     } finally {
       setSaving(false);
     }
@@ -909,13 +949,26 @@ export default function AdminUserDetailPage({ params }: { params: Promise<{ user
               <div className="text-center mb-6">
                 <div className="w-20 h-20 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <span className="text-3xl text-indigo-600">
-                    {(targetUser?.username || targetUser?.email || "U")[0].toUpperCase()}
+                    {(targetUser?.display_name || targetUser?.username || targetUser?.email || "U")[0].toUpperCase()}
                   </span>
                 </div>
-                <h2 className="text-xl font-bold text-gray-900">
-                  {targetUser?.username || "משתמש"}
-                </h2>
-                <p className="text-gray-500 text-sm">{targetUser?.email}</p>
+                <button
+                  onClick={() => {
+                    setNewDisplayName(targetUser?.display_name || "");
+                    setShowDisplayNameModal(true);
+                  }}
+                  className="group">
+                  <h2 className="text-xl font-bold text-gray-900 group-hover:text-indigo-600 transition-colors">
+                    {targetUser?.display_name || targetUser?.username || "משתמש"}
+                  </h2>
+                  {targetUser?.display_name && (
+                    <p className="text-gray-400 text-xs">(@{targetUser?.username})</p>
+                  )}
+                  <p className="text-indigo-500 text-xs mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    לחץ לעריכת שם תצוגה
+                  </p>
+                </button>
+                <p className="text-gray-500 text-sm mt-1">{targetUser?.email}</p>
               </div>
 
               <div className="space-y-4">
@@ -1444,6 +1497,69 @@ export default function AdminUserDetailPage({ params }: { params: Promise<{ user
                   onClick={() => {
                     setShowCreditsModal(false);
                     setCreditsAmount(0);
+                  }}
+                  className="flex-1 bg-gray-100 text-gray-700 font-semibold py-3 px-4 rounded-lg hover:bg-gray-200 transition-colors">
+                  ביטול
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Display Name Modal */}
+      {showDisplayNameModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4" dir="rtl">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-bold text-gray-900">עריכת שם תצוגה</h2>
+                <button
+                  onClick={() => {
+                    setShowDisplayNameModal(false);
+                    setNewDisplayName("");
+                  }}
+                  className="text-gray-400 hover:text-gray-600 text-2xl">
+                  ✕
+                </button>
+              </div>
+
+              <div className="mb-4 p-4 bg-gray-50 rounded-lg">
+                <div className="text-sm text-gray-500 text-right">שם משתמש (לא ניתן לשינוי)</div>
+                <div className="text-lg font-medium text-gray-800 text-right">
+                  {targetUser?.username || "---"}
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1 text-right">
+                    שם תצוגה
+                  </label>
+                  <input
+                    type="text"
+                    value={newDisplayName}
+                    onChange={(e) => setNewDisplayName(e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-right placeholder:text-gray-500"
+                    placeholder="הכנס שם תצוגה (או השאר ריק לשימוש בשם המשתמש)"
+                  />
+                  <p className="text-sm text-gray-500 mt-1 text-right">
+                    שם זה יוצג במקום שם המשתמש בברכת "שלום" באפליקציה
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={handleUpdateDisplayName}
+                  disabled={saving}
+                  className="flex-1 bg-indigo-600 text-white font-semibold py-3 px-4 rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors">
+                  {saving ? "שומר..." : "שמור שם תצוגה"}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowDisplayNameModal(false);
+                    setNewDisplayName("");
                   }}
                   className="flex-1 bg-gray-100 text-gray-700 font-semibold py-3 px-4 rounded-lg hover:bg-gray-200 transition-colors">
                   ביטול
