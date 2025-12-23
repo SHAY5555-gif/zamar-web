@@ -44,7 +44,7 @@ export default function SongsPage() {
   const [showAIImportModal, setShowAIImportModal] = useState(false);
   const [aiSearchQueries, setAiSearchQueries] = useState<string[]>([""]);
   const [aiSearchingIndexes, setAiSearchingIndexes] = useState<Set<number>>(new Set());
-  const [aiResults, setAiResults] = useState<({ title: string; artist: string; lyrics: string } | null)[]>([null]);
+  const [aiResults, setAiResults] = useState<({ title: string; artist: string; lyrics: string; language?: Song["language"] } | null)[]>([null]);
   const [aiError, setAiError] = useState("");
 
   useEffect(() => {
@@ -315,19 +315,82 @@ export default function SongsPage() {
       if (!response.ok) throw new Error("Failed to search");
 
       const data = await response.json();
-      const aiMessage = data.message;
+      // Try message first, then fallback to raw response
+      let aiMessage = data.message;
+
+      // If message is empty, try to extract from raw response
+      if ((!aiMessage || aiMessage.trim() === "") && data.raw) {
+        // Try to find JSON in raw response
+        const rawJsonMatch = data.raw.match(/\[[\s\S]*\{[\s\S]*"title"[\s\S]*"artist"[\s\S]*"lyrics"[\s\S]*\}[\s\S]*\]/);
+        const rawSingleMatch = data.raw.match(/\{[\s\S]*"title"[\s\S]*"artist"[\s\S]*"lyrics"[\s\S]*\}/);
+        if (rawJsonMatch) {
+          aiMessage = rawJsonMatch[0];
+        } else if (rawSingleMatch) {
+          aiMessage = rawSingleMatch[0];
+        }
+      }
 
       if (!aiMessage || aiMessage.trim() === "") {
+        console.error("AI response empty. Raw:", data.raw?.slice(0, 500));
         setAiError("לא התקבלה תשובה מה-AI. נסה שוב.");
         return;
       }
 
-      // Try to parse JSON from response
-      let result: { title: string; artist: string; lyrics: string };
-      const jsonMatch = aiMessage.match(/\{[\s\S]*"title"[\s\S]*"artist"[\s\S]*"lyrics"[\s\S]*\}/);
-      if (jsonMatch) {
+      // Try to parse JSON from response - supports both array format and single object format
+      let result: { title: string; artist: string; lyrics: string; language?: Song["language"] };
+
+      // First try to match array format: [{"title": ..., "artist": ..., "lyrics": ..., "language": ...}]
+      const arrayMatch = aiMessage.match(/\[[\s\S]*\{[\s\S]*"title"[\s\S]*"artist"[\s\S]*"lyrics"[\s\S]*\}[\s\S]*\]/);
+      const singleMatch = aiMessage.match(/\{[\s\S]*"title"[\s\S]*"artist"[\s\S]*"lyrics"[\s\S]*\}/);
+
+      if (arrayMatch) {
         try {
-          const parsed = JSON.parse(jsonMatch[0]);
+          const parsed = JSON.parse(arrayMatch[0]);
+          if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].title && parsed[0].artist && parsed[0].lyrics) {
+            const song = parsed[0];
+            // Map language code from API to app's language type (optional)
+            let lang: Song["language"] | undefined = undefined;
+            if (song.language === "en") lang = "en";
+            else if (song.language === "ar") lang = "ar";
+            else if (song.language === "he") lang = "he";
+            else if (song.language === "aramaic") lang = "aramaic";
+            result = {
+              title: song.title,
+              artist: song.artist,
+              lyrics: song.lyrics,
+              language: lang,
+            };
+          } else {
+            throw new Error("Invalid array JSON");
+          }
+        } catch {
+          // Fallback to single object match
+          if (singleMatch) {
+            try {
+              const parsed = JSON.parse(singleMatch[0]);
+              if (parsed.title && parsed.artist && parsed.lyrics) {
+                result = parsed;
+              } else {
+                throw new Error("Invalid JSON");
+              }
+            } catch {
+              result = {
+                title: query.split(" - ")[0] || query,
+                artist: query.split(" - ")[1] || "",
+                lyrics: aiMessage,
+              };
+            }
+          } else {
+            result = {
+              title: query.split(" - ")[0] || query,
+              artist: query.split(" - ")[1] || "",
+              lyrics: aiMessage,
+            };
+          }
+        }
+      } else if (singleMatch) {
+        try {
+          const parsed = JSON.parse(singleMatch[0]);
           if (parsed.title && parsed.artist && parsed.lyrics) {
             result = parsed;
           } else {
@@ -412,7 +475,7 @@ export default function SongsPage() {
               title: result!.title,
               artist: result!.artist,
               lyrics: result!.lyrics,
-              language: "he",
+              language: result!.language || "he",
             }),
           }
         );
@@ -959,6 +1022,11 @@ export default function SongsPage() {
                       <div className="mt-4 space-y-3 border-t pt-3">
                         <div className="flex items-center gap-2">
                           <span className="text-green-600 text-sm font-medium">נמצא</span>
+                          {aiResults[index]!.language && (
+                            <span className="text-xs text-gray-500">
+                              (זוהתה שפה: {aiResults[index]!.language === "he" ? "עברית" : aiResults[index]!.language === "ar" ? "ערבית" : aiResults[index]!.language === "aramaic" ? "ארמית" : "אנגלית"})
+                            </span>
+                          )}
                         </div>
                         <div>
                           <label className="block text-xs font-medium text-gray-600 mb-1">שם השיר</label>
@@ -977,6 +1045,18 @@ export default function SongsPage() {
                             onChange={(e) => handleUpdateAIResult(index, "artist", e.target.value)}
                             className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm text-right"
                           />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">שפה</label>
+                          <select
+                            value={aiResults[index]!.language || "he"}
+                            onChange={(e) => handleUpdateAIResult(index, "language", e.target.value)}
+                            className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm text-right">
+                            <option value="he">עברית</option>
+                            <option value="ar">ערבית</option>
+                            <option value="aramaic">ארמית</option>
+                            <option value="en">אנגלית</option>
+                          </select>
                         </div>
                         <div>
                           <label className="block text-xs font-medium text-gray-600 mb-1">מילות השיר</label>

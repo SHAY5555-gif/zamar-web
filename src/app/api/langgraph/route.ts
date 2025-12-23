@@ -33,7 +33,7 @@ export async function GET() {
 // Send message to thread (streaming)
 export async function POST(request: NextRequest) {
   try {
-    const { thread_id, message, assistant_id = "cerebras_zamar" } = await request.json();
+    const { thread_id, message, assistant_id = "genius_lyrics" } = await request.json();
 
     if (!thread_id || !message) {
       return NextResponse.json(
@@ -84,15 +84,48 @@ export async function POST(request: NextRequest) {
         try {
           const data = JSON.parse(line.slice(6));
           if (data.messages && Array.isArray(data.messages)) {
-            const lastMessage = data.messages[data.messages.length - 1];
-            if (lastMessage?.type === "ai" && lastMessage?.content) {
-              lastAIMessage = lastMessage.content;
+            // Look for the last AI/assistant message with actual content
+            for (let i = data.messages.length - 1; i >= 0; i--) {
+              const msg = data.messages[i];
+              // Check various AI message formats
+              const isAI = msg?.type === "ai" ||
+                          msg?.type === "AIMessage" ||
+                          msg?.role === "assistant" ||
+                          msg?.type?.toLowerCase?.() === "ai";
+
+              // Skip messages that are tool calls (intermediate messages)
+              const hasToolCalls = msg?.tool_calls && msg.tool_calls.length > 0;
+
+              // Check for content in various places:
+              // 1. Direct content field
+              // 2. additional_kwargs.reasoning (used by some models)
+              const directContent = msg?.content && msg.content.trim().length > 0 ? msg.content : null;
+              const reasoningContent = msg?.additional_kwargs?.reasoning &&
+                                       msg.additional_kwargs.reasoning.trim().length > 0
+                                       ? msg.additional_kwargs.reasoning : null;
+              const messageContent = directContent || reasoningContent;
+
+              if (isAI && messageContent && !hasToolCalls) {
+                lastAIMessage = messageContent;
+                break;
+              }
+
+              // Also check tool messages for lyrics JSON (fallback)
+              if (msg?.type === "tool" && msg?.content && msg.content.includes('"lyrics"')) {
+                lastAIMessage = msg.content;
+                // Don't break - prefer AI message if found later
+              }
             }
           }
         } catch {
           // Skip invalid JSON lines
         }
       }
+    }
+
+    // Log for debugging if no message found
+    if (!lastAIMessage) {
+      console.log("LangGraph raw response (no AI message found):", text.slice(0, 2000));
     }
 
     return NextResponse.json({
