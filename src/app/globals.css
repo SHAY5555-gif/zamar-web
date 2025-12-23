@@ -35,4 +35,14 @@ input,
 textarea,
 select {
   text-align: right;
+  color: #171717;
+}
+
+/* Dark mode support for form elements */
+@media (prefers-color-scheme: dark) {
+  input,
+  textarea,
+  select {
+    color: #ededed;
+  }
 }
