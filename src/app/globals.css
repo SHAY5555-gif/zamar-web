@@ -36,3 +36,32 @@ textarea,
 select {
   text-align: right;
 }
+
+/* Form elements styling */
+input:not([type="checkbox"]):not([type="radio"]),
+textarea,
+select {
+  color: #1f2937; /* gray-800 - dark text for visibility */
+  background-color: #ffffff;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #6b7280; /* gray-500 - visible placeholder */
+}
+
+/* Dark mode form elements */
+@media (prefers-color-scheme: dark) {
+  input:not([type="checkbox"]):not([type="radio"]),
+  textarea,
+  select {
+    color: #f3f4f6; /* gray-100 - light text for dark mode */
+    background-color: #1f2937; /* gray-800 background */
+    border-color: #4b5563; /* gray-600 border */
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: #9ca3af; /* gray-400 - visible placeholder in dark mode */
+  }
+}
